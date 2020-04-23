@@ -2,7 +2,7 @@
 Terminálos kliens a parlament.hu-hoz.
 
 Jelenlegi funkciók:
-* Szavazások eredményeinek megjelenítése
+* szavazások eredményének megjelenítése
 
 Tervezett:
 * videók letöltése
