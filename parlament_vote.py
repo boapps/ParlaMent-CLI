@@ -2,9 +2,12 @@ import requests
 import bs4
 from datetime import datetime
 from datetime import timedelta
+import re
 
 VOTE_URL = 'https://parlament.hu/web/guest/szavazasok-elozo-ciklusbeli-adatai?p_p_id=hu_parlament_cms_pair_portlet_PairProxy_INSTANCE_9xd2Wc9jP4z8&p_p_lifecycle=1&p_p_state=normal&p_p_mode=view&_hu_parlament_cms_pair_portlet_PairProxy_INSTANCE_9xd2Wc9jP4z8_pairAction=%2Finternet%2Fcplsql%2Fogy_szav.szav_irom%3FP_DATUM_TOL%3D{start}%26P_CKL%3D{cycle}%26P_DATUM_IG%3D{end}'
 CYCLES_URL = 'https://www.parlament.hu/web/guest/szavazasok-elozo-ciklusbeli-adatai'
+DAYS_URL = 'https://www.parlament.hu/naplo{cycle}/index.htm'
+
 
 class Vote:
     def __init__(self, date, mode, yes_count, no_count, neutral_count, count, acceptance, note, attachments):
@@ -131,6 +134,29 @@ def get_cycles():
     return cycles
 
 
+def get_days(cycle):
+    response = requests.get(DAYS_URL.format(cycle=cycle))
+    days_content = str(response.content)
+
+    if int(cycle) >= 40:
+        days = re.findall('p_nap=([0-9]+)', days_content)
+        day_names = re.findall('p_nap=[0-9]*">([0-9\.]*)', days_content)
+    elif int(cycle) >= 38:
+        days = re.findall('href="/naplo'+cycle+'/([0-9]*)/[0-9]*\.htm', days_content)
+        day_names = re.findall('<td>([0-9\.]+)', days_content)
+    elif int(cycle) >= 36:
+        days = re.findall('href="([0-9]*)/[0-9]*\.htm', days_content)
+        day_names = re.findall('<td>\ ([0-9\.]+)', days_content)
+    elif int(cycle) == 35:
+        days = re.findall('href="../naplo'+cycle+'/([0-9]*)/[0-9]*tart\.htm', days_content)
+        day_names = re.findall('[0-9]{4}\.[0-9]{2}\.[0-9]{2}', days_content)
+    else:
+        days = re.findall('href="/naplo'+cycle+'/([0-9]*)/[0-9]*tart\.htm', days_content)
+        day_names = re.findall('[0-9]{4}\.[0-9]{2}\.[0-9]{2}', days_content)
+
+    return list(zip(days, day_names))
+
+
 def get_votes(selected_cycle, start, end):
     votes = list()
     response = requests.get(VOTE_URL.format(cycle=selected_cycle, start=start, end=end))
@@ -229,40 +255,45 @@ def get_which_cycle(cycles, date):
             return cycle
 
 
-print(
-    '{0:6} {1:>12} {2:>12} {3:>12} {4:>22} {5:>12} {6:>12}'.format(
-    'ciklus', 'név', 'kezdet', 'vége', 'miniszterelnök', 'kezdet', 'vége'
-    ))
-
-cycles = get_cycles()
-
-for cycle in cycles:
+def main():
     print(
         '{0:6} {1:>12} {2:>12} {3:>12} {4:>22} {5:>12} {6:>12}'.format(
-        cycle.cycle_id, cycle.name, cycle.start, cycle.end, cycle.prime_ministers[0].name,
-            cycle.prime_ministers[0].start, cycle.prime_ministers[0].end
+        'ciklus', 'név', 'kezdet', 'vége', 'miniszterelnök', 'kezdet', 'vége'
         ))
-    if len(cycle.prime_ministers) > 1:
-        for pm in cycle.prime_ministers[1:]:
-            print('{0:>68} {1:>12} {2:>12}'.format(pm.name, pm.start, pm.end))
 
-print('Szavazások mutatása adott ciklusban, két időpont között')
+    cycles = get_cycles()
 
-today_date = datetime.now()
-week_ago_date = today_date - timedelta(days=7)
-selected_start_str = week_ago_date.strftime("%Y.%m.%d")
-selected_end_str = today_date.strftime("%Y.%m.%d")
+    for cycle in cycles:
+        print(
+            '{0:6} {1:>12} {2:>12} {3:>12} {4:>22} {5:>12} {6:>12}'.format(
+            cycle.cycle_id, cycle.name, cycle.start, cycle.end, cycle.prime_ministers[0].name,
+                cycle.prime_ministers[0].start, cycle.prime_ministers[0].end
+            ))
+        if len(cycle.prime_ministers) > 1:
+            for pm in cycle.prime_ministers[1:]:
+                print('{0:>68} {1:>12} {2:>12}'.format(pm.name, pm.start, pm.end))
 
-selected_start = input('kezdet [{}]: '.format(selected_start_str)).strip()
-if selected_start == '':
-    selected_start = selected_start_str
+    print('Szavazások mutatása adott ciklusban, két időpont között')
 
-selected_cycle = get_which_cycle(cycles, datetime.strptime(selected_start, '%Y.%m.%d'))
+    today_date = datetime.now()
+    week_ago_date = today_date - timedelta(days=7)
+    selected_start_str = week_ago_date.strftime("%Y.%m.%d")
+    selected_end_str = today_date.strftime("%Y.%m.%d")
 
-selected_end = input('vége [{}]: '.format(selected_end_str)).strip()
-if selected_end == '':
-    selected_end = selected_end_str
+    selected_start = input('kezdet [{}]: '.format(selected_start_str)).strip()
+    if selected_start == '':
+        selected_start = selected_start_str
 
-votes = get_votes(selected_cycle.cycle_id, selected_start, selected_end)
-for vote in votes:
-    print(vote)
+    selected_cycle = get_which_cycle(cycles, datetime.strptime(selected_start, '%Y.%m.%d'))
+
+    selected_end = input('vége [{}]: '.format(selected_end_str)).strip()
+    if selected_end == '':
+        selected_end = selected_end_str
+
+    votes = get_votes(selected_cycle.cycle_id, selected_start, selected_end)
+    for vote in votes:
+        print(vote)
+
+
+if __name__ == "__main__":
+    main()
