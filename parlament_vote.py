@@ -142,8 +142,8 @@ def get_days(cycle):
         days = re.findall('p_nap=([0-9]+)', days_content)
         day_names = re.findall('p_nap=[0-9]*">([0-9\.]*)', days_content)
     elif int(cycle) >= 38:
-        days = re.findall('href="/naplo'+cycle+'/([0-9]*)/[0-9]*\.htm', days_content)
-        day_names = re.findall('<td>([0-9\.]+)', days_content)
+        days = re.findall('href="/naplo'+cycle+'/([0-9]*)/[0-9]*\.htm', days_content.lower())
+        day_names = re.findall('<td>([0-9\.]+)', days_content.lower())
     elif int(cycle) >= 36:
         days = re.findall('href="([0-9]*)/[0-9]*\.htm', days_content)
         day_names = re.findall('<td>\ ([0-9\.]+)', days_content)
